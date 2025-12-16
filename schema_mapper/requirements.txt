@@ -1,3 +1,5 @@
+flask
+flask-Cors
 google-adk
 google-cloud-bigquery
 google-cloud-storage
