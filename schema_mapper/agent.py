@@ -4,14 +4,28 @@ from google.adk.agents import SequentialAgent
 #from .workers.storage_agent import storage_agent
 from .sub_agents.transform import transform_agent
 
+import workers.storage_agent as storage_agent
+import workers.schema_agent as schema_agent
+import tools.storage_tools as storage_tools
+import tools.schema_tools as schema_tools
 
 root_agent = Agent(
     model='gemini-2.5-flash',
     name='root_agent',
-    description='An agent that performs intelligent schema discovery, data conversion, and bigquery data loading',
-    instruction='''You are an orchestrator. 
-    Delegate all Cloud Storage and file-browsing tasks to the storage_specialist.
-    When asked what you can do, explain that you manage a team of specialists including a storage expert.''',
-    #sub_agents=[storage_agent.storage_specialist]
-    sub_agents = [transform_agent]
+    description='ETL Orchestrator capable of both conversational support and automated schema mapping.',
+    instruction='''You are an ETL Orchestrator. 
+    
+    CRITICAL WORKFLOW for "Generate mapping for [filename]":
+    1. GATHER DATA: Use retrieve_source_data and retrieve_target_schema to get the CSV preview and SQL DDL.
+    2. CREATE CONTEXT: Call get_mapping_context with those results to generate the raw source/target JSON.
+    3. TRANSFORM: Pass that raw JSON output to the transform agent. 
+    4. MANDATE: Explicitly command the schema_specialist: "Flatten this data into a single JSON list with 4 keys: csv_column, sql_column, type, and mode. Remove the 'csv_source_fields' and 'target_sql_columns' wrappers."
+    
+    If any tool returns an error, stop and show the error. Otherwise, proceed until ONLY the final cleaned JSON is displayed. No conversational filler.''',
+    tools=[
+        storage_tools.retrieve_source_data,
+        storage_tools.retrieve_target_schema,
+        schema_tools.get_mapping_context
+    ],
+    sub_agents=[storage_agent.storage_specialist, schema_agent.schema_specialist, transform_agent]
 )
