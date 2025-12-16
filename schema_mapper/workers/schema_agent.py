@@ -1,5 +1,5 @@
 from google.adk.agents.llm_agent import Agent
-from tools.schema_tools import get_mapping_context
+from ..tools.schema_tools import get_mapping_context
 
 schema_specialist = Agent(
     model='gemini-2.5-flash',

@@ -4,10 +4,11 @@ from google.adk.agents import SequentialAgent
 #from .workers.storage_agent import storage_agent
 from .sub_agents.transform import transform_agent
 
-import workers.storage_agent as storage_agent
-import workers.schema_agent as schema_agent
-import tools.storage_tools as storage_tools
-import tools.schema_tools as schema_tools
+from .workers import storage_agent
+from .workers import schema_agent
+
+from .tools import storage_tools
+from .tools import schema_tools
 
 root_agent = Agent(
     model='gemini-2.5-flash',

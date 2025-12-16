@@ -1,5 +1,5 @@
 from google.adk.agents.llm_agent import Agent
-import tools.storage_tools
+from ..tools import storage_tools
 
 storage_specialist = Agent(
     model='gemini-2.5-flash',
@@ -12,10 +12,11 @@ storage_specialist = Agent(
     Use retrieve_target_schema to retrieve the sql file for a particular CSV
     Report the file structure or file list back to the requester clearly.''',
     tools=[
-        tools.storage_tools.list_source_data,
-        tools.storage_tools.list_target_schemas,
-        tools.storage_tools.retrieve_source_data,
-        tools.storage_tools.retrieve_target_schema
-    ]
-  
+        storage_tools.list_source_data,
+        storage_tools.list_target_schemas,
+        storage_tools.retrieve_source_data,
+        storage_tools.retrieve_target_schema
+    ] 
 )
+
+
