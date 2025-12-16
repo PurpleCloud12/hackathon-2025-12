@@ -5,14 +5,13 @@ import workers.schema_agent as schema_agent
 root_agent = Agent(
     model='gemini-2.5-flash',
     name='root_agent',
-    description='Orchestrator for GCS data discovery and BigQuery schema generation.',
-    instruction='''You are an ETL Orchestrator. Your job is to coordinate between the storage_specialist and the schema_specialist.
-    
-    FLOW:
-    1. When a user asks for a schema, first ask the storage_specialist to "retrieve_source_data" for that specific file.
-    2. Once you have the data, extract the headers (first line) and one sample row.
-    3. Send those headers and the sample row to the schema_specialist.
-    4. MANDATORY: Explicitly instruct the schema_specialist to use its "generate_schema_suggestion" tool and return the result as a raw JSON list.
-    5. Do not generate SQL unless the user specifically asks for it; prioritize the JSON schema output from the tool.''',
+    description='Silent Orchestrator for GCS to BigQuery Schema mapping.',
+    instruction='''You are a silent ETL Orchestrator. When a user asks for a schema for a file, you must execute the following chain IMMEDIATELY without asking for permission or explaining your capabilities:
+
+    1. CALL storage_specialist.display_csv_lines for the requested file to get a data preview.
+    2. EXTRACT the headers (the first line) and at least one representative sample row from that preview.
+    3. PASS these headers and the sample row to the schema_specialist.
+    4. MANDATORY: Instruct the schema_specialist to execute its "generate_schema_suggestion" tool.
+    5. OUTPUT POLICY: Display ONLY the raw JSON schema list returned by the tool. Do not generate SQL unless explicitly asked. Do not provide conversational filler or introductory text.''',
     sub_agents=[storage_agent.storage_specialist, schema_agent.schema_specialist]
 )
