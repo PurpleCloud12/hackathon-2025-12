@@ -6,6 +6,38 @@ BUCKET_NAME = os.environ.get("TARGET_GCS_BUCKET", "")
 FOLDER_PREFIX = os.environ.get("SOURCE_DATA_FOLDER", "")
 TARGET_SCHEMA_PREFIX = os.environ.get("TARGET_SCHEMA_FOLDER", "")
 
+def list_csv_files() -> str:
+    """Lists all CSV files available in the GCS bucket as a comma-separated string."""
+    from google.cloud import storage
+    import os
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    bucket_name = os.environ.get("TARGET_GCS_BUCKET")
+    folder_prefix = os.environ.get("SOURCE_DATA_FOLDER", "")
+    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
+
+    if not bucket_name:
+        return "ERROR: TARGET_GCS_BUCKET environment variable is not set."
+
+    try:
+        client = storage.Client(project=project_id)
+        bucket = client.bucket(bucket_name)
+        
+        blobs = client.list_blobs(bucket_name, prefix=folder_prefix)
+        
+        csv_files = [b.name for b in blobs if b.name.endswith('.csv')]
+        
+        if not csv_files:
+            return f"No CSV files found in bucket '{bucket_name}' with prefix '{folder_prefix}'."
+            
+        return ", ".join(csv_files)
+        
+    except Exception as e:
+        logger.error(f"Failed to list blobs: {str(e)}")
+        return f"ERROR: Failed to access bucket. {str(e)}"
+
 def list_source_data() -> list[str]:
     """
     Lists all available CSV source data files from the project's data storage.
@@ -83,29 +115,56 @@ def retrieve_target_schema(csv_name: str) -> str:
     except Exception as e:
         return f"Error reading SQL file '{target_sql_file}': {str(e)}"
 
-def retrieve_source_data(csv_name: str, lines: int = 10) -> str:
-    """ Reads a given CSV file from the project's data storage and returns the first N lines.
+def preview_source_data(csv_name: str, lines: int = 10) -> str:
+    """ Reads a given CSV file from GCS and returns the first N lines.
     
     Args:
-        csv_name: The name of the CSV file (e.g., 'borrowers.csv') to read.
+        csv_name: The name or path of the CSV file.
         lines: How many lines to return (defaults to 10).
     """
-    if not BUCKET_NAME:
-        return "Error: TARGET_GCS_BUCKET not set."
+    import os
+    from google.cloud import storage
 
-    namespace = validated_bucket(FOLDER_PREFIX,csv_name) 
-    if not namespace.blob.exists():
-        return f"Error: File '{csv_name}' not found at path '{namespace.blob_path}'."
+    # 1. Freshly fetch config to avoid "missing bucket name" errors
+    bucket_name = os.environ.get("TARGET_GCS_BUCKET")
+    folder_prefix = os.environ.get("SOURCE_DATA_FOLDER", "")
+
+    if not bucket_name:
+        return "Error: TARGET_GCS_BUCKET environment variable is not set."
 
     try:
-        content = namespace.blob.download_as_text()
+        # 2. Slash-Safe Path Construction
+        # Removes leading/trailing slashes and joins them correctly
+        clean_prefix = folder_prefix.strip("/")
+        clean_file = csv_name.lstrip("/")
+        
+        # If prefix exists, join with file; otherwise just use file
+        blob_path = f"{clean_prefix}/{clean_file}" if clean_prefix else clean_file
+        
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(blob_path)
+
+        # 3. Explicit existence check with clear error reporting
+        if not blob.exists():
+            return f"Error: File not found at gs://{bucket_name}/{blob_path}"
+
+        # 4. Memory-efficient read (downloading only what we need if possible)
+        # For small previews, download_as_text is fine, but we'll add a safety catch
+        content = blob.download_as_text()
         line_list = content.splitlines()
         
-        preview = "\n".join(line_list[:int(lines)])
-        return preview
+        # Ensure 'lines' is an int even if the agent passes it as a string
+        num_lines = int(lines)
+        preview = "\n".join(line_list[:num_lines])
+        
+        return f"--- Preview of {blob_path} ---\n{preview}"
 
+    except ValueError:
+        return "Error: The 'lines' parameter must be a valid number."
     except Exception as e:
-        return f"Error reading CSV: {str(e)}"
+        # Returning the error as a string prevents the ADK's asyncio loop from crashing
+        return f"Error reading CSV : {str(e)}"
 
 def validated_bucket(prefix: str, file_name: str) -> SimpleNamespace:
     """

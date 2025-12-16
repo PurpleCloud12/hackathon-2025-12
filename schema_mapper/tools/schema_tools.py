@@ -1,5 +1,13 @@
 import re
 import json
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("mapping_context")
 
 def infer_bigquery_type(sample_value: str) -> str:
     """Helper to determine a BigQuery type for a single string value."""
@@ -15,34 +23,65 @@ def infer_bigquery_type(sample_value: str) -> str:
 
 def parse_sql_ddl(sql_text: str) -> list[dict]:
     """Extracts column names, types, and modes, ignoring CREATE TABLE syntax."""
+    logger.info("Parsing SQL DDL text...")
+    
+    # Regex pattern to match column definitions
     pattern = re.compile(r'^\s+([a-zA-Z0-9_]+)\s+([A-Z0-9]+)(?:\s+(NOT NULL))?', re.MULTILINE | re.IGNORECASE)
     columns = []
-    for match in pattern.finditer(sql_text):
+    
+    matches = list(pattern.finditer(sql_text))
+    if not matches:
+        logger.warning("No column definitions found in the provided SQL DDL. Check your regex or DDL format.")
+        
+    for match in matches:
         name, bq_type, not_null = match.groups()
         if name.upper() in ["CREATE", "TABLE", "PARTITION", "CLUSTER"]:
             continue
-        columns.append({
+            
+        col_def = {
             "name": name,
             "type": bq_type.upper(),
             "mode": "REQUIRED" if not_null else "NULLABLE"
-        })
+        }
+        columns.append(col_def)
+        logger.debug(f"Parsed SQL Column: {name} ({bq_type})")
+
+    logger.info(f"Successfully parsed {len(columns)} columns from DDL.")
     return columns
 
 def get_mapping_context(csv_preview: str, target_ddl: str) -> str:
     """
     Combines CSV discovery and SQL parsing into a structured context object.
     """
-    lines = csv_preview.strip().split('\n')
-    headers = [h.strip() for h in lines[0].split(',')]
-    samples = [s.strip() for s in lines[1].split(',')] if len(lines) > 1 else [""] * len(headers)
+    logger.info("Generating mapping context from CSV preview and DDL.")
     
-    csv_discovery = []
-    for h, s in zip(headers, samples):
-        csv_discovery.append({"header": h, "inferred_type": infer_bigquery_type(s)})
+    try:
+        lines = csv_preview.strip().split('\n')
+        if not lines:
+            raise ValueError("CSV preview is empty.")
 
-    target_columns = parse_sql_ddl(target_ddl)
+        headers = [h.strip() for h in lines[0].split(',')]
+        logger.info(f"Found {len(headers)} headers in CSV preview.")
+        
+        samples = [s.strip() for s in lines[1].split(',')] if len(lines) > 1 else [""] * len(headers)
+        
+        csv_discovery = []
+        for h, s in zip(headers, samples):
+            inferred = infer_bigquery_type(s)
+            csv_discovery.append({"header": h, "inferred_type": inferred})
+            logger.debug(f"CSV Header: {h} | Sample: {s} | Inferred: {inferred}")
 
-    return json.dumps({
-        "csv_source_fields": csv_discovery,
-        "target_sql_columns": target_columns
-    }, indent=2)
+        # Process SQL
+        target_columns = parse_sql_ddl(target_ddl)
+
+        context = {
+            "csv_source_fields": csv_discovery,
+            "target_sql_columns": target_columns
+        }
+        
+        logger.info("Mapping context generated successfully.")
+        return json.dumps(context, indent=2)
+
+    except Exception as e:
+        logger.exception("Error generating mapping context.")
+        return json.dumps({"error": str(e)})
