@@ -1,0 +1,5 @@
+
+{
+  "name": "SQL Data Validator",
+  "description": "An AI-powered chatbot that translates natural language commands into SQL queries to compare and validate data between two tables, displaying the results dynamically."
+}
