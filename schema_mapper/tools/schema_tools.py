@@ -13,21 +13,36 @@ def infer_bigquery_type(sample_value: str) -> str:
         return "DATE"
     return "STRING"
 
-def generate_schema_suggestion(csv_headers: list[str], sample_row: list[str]) -> str:
-    """
-    Takes headers and a sample row to produce a starting BigQuery JSON schema.
-    
-    Args:
-        csv_headers: List of column names.
-        sample_row: List of values from a representative row.
-    """
-    schema = []
-    for header, value in zip(csv_headers, sample_row):
-        detected_type = infer_bigquery_type(str(value))
-        schema.append({
-            "name": header.replace(" ", "_").replace("-", "_"),
-            "type": detected_type,
-            "mode": "NULLABLE"
+def parse_sql_ddl(sql_text: str) -> list[dict]:
+    """Extracts column names, types, and modes, ignoring CREATE TABLE syntax."""
+    pattern = re.compile(r'^\s+([a-zA-Z0-9_]+)\s+([A-Z0-9]+)(?:\s+(NOT NULL))?', re.MULTILINE | re.IGNORECASE)
+    columns = []
+    for match in pattern.finditer(sql_text):
+        name, bq_type, not_null = match.groups()
+        if name.upper() in ["CREATE", "TABLE", "PARTITION", "CLUSTER"]:
+            continue
+        columns.append({
+            "name": name,
+            "type": bq_type.upper(),
+            "mode": "REQUIRED" if not_null else "NULLABLE"
         })
+    return columns
+
+def get_mapping_context(csv_preview: str, target_ddl: str) -> str:
+    """
+    Combines CSV discovery and SQL parsing into a structured context object.
+    """
+    lines = csv_preview.strip().split('\n')
+    headers = [h.strip() for h in lines[0].split(',')]
+    samples = [s.strip() for s in lines[1].split(',')] if len(lines) > 1 else [""] * len(headers)
     
-    return json.dumps(schema, indent=2)
+    csv_discovery = []
+    for h, s in zip(headers, samples):
+        csv_discovery.append({"header": h, "inferred_type": infer_bigquery_type(s)})
+
+    target_columns = parse_sql_ddl(target_ddl)
+
+    return json.dumps({
+        "csv_source_fields": csv_discovery,
+        "target_sql_columns": target_columns
+    }, indent=2)

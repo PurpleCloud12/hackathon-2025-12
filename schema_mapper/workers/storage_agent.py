@@ -7,10 +7,15 @@ storage_specialist = Agent(
     description='Specializes in browsing and reading files from Google Cloud Storage buckets.',
     instruction='''You are an expert at navigating GCS buckets. 
     Use list_source_data to see what files are available.
+    Use list_target_schemas to view the available sql target schemas
     Use retrieve_source_data to inspect the contents of a specific file.
+    Use retrieve_target_schema to retrieve the sql file for a particular CSV
     Report the file structure or file list back to the requester clearly.''',
     tools=[
         tools.storage_tools.list_source_data,
-        tools.storage_tools.retrieve_source_data
+        tools.storage_tools.list_target_schemas,
+        tools.storage_tools.retrieve_source_data,
+        tools.storage_tools.retrieve_target_schema
     ]
+  
 )
