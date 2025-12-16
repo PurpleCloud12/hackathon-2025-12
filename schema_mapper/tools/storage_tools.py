@@ -29,7 +29,7 @@ def list_source_data() -> list[str]:
         return [f"No CSV files found in {prefix}"]
 
     return csv_files
-def display_csv_lines(csv_name: str, lines: int = 10) -> str:
+def retrieve_source_data(csv_name: str, lines: int = 10) -> str:
     """
     Reads a given CSV file from the project's data storage and returns the first N lines.
     

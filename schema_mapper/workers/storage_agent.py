@@ -11,6 +11,6 @@ storage_specialist = Agent(
     Report the file structure or file list back to the requester clearly.''',
     tools=[
         tools.storage_tools.list_source_data,
-        tools.storage_tools.display_csv_lines
+        tools.storage_tools.retrieve_source_data
     ]
 )
