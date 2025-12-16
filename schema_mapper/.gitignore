@@ -1,0 +1,22 @@
+# --- Environment & Secrets ---
+.env
+.venv/
+venv/
+env/
+ENV/
+
+# --- Python Caches & Metadata ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# --- Project Specifics ---
+# Ignore local data outputs if you don't want them in version control
+output/*.json
+data/source_csvs/*.csv
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
